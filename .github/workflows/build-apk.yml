@@ -1,0 +1,145 @@
+name: Build APK
+
+# عنوان اجرا شامل شناسه ساخت است تا سایت بتواند اجرای مربوط به هر درخواست را پیدا کند.
+run-name: "fizer-${{ inputs.job_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      job_id:
+        description: "شناسه ساخت (۲۴ حرف hex)"
+        required: true
+        type: string
+      app_name:
+        description: "نام اپلیکیشن"
+        required: true
+        type: string
+      package_name:
+        description: "شناسه بسته، مثل ir.fizer.a1b2c3d4e5"
+        required: true
+        type: string
+      version_code:
+        description: "کد نسخه (عدد صحیح)"
+        required: false
+        default: "1"
+        type: string
+      payload_url:
+        description: "آدرس apk.php روی سایت؛ اگر خالی باشد از sample/ استفاده می‌شود (حالت آزمایشی)"
+        required: false
+        default: ""
+        type: string
+      payload_token:
+        description: "توکن یک‌بارمصرف دریافت فایل‌ها"
+        required: false
+        default: ""
+        type: string
+
+# حداقل دسترسی: این گردش‌کار فقط کد مخزن را می‌خواند.
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      JOB_ID: ${{ inputs.job_id }}
+      APP_NAME: ${{ inputs.app_name }}
+      PACKAGE_NAME: ${{ inputs.package_name }}
+      VERSION_CODE: ${{ inputs.version_code }}
+      PAYLOAD_URL: ${{ inputs.payload_url }}
+      PAYLOAD_TOKEN: ${{ inputs.payload_token }}
+    steps:
+      - name: Mask token
+        run: |
+          if [ -n "$PAYLOAD_TOKEN" ]; then echo "::add-mask::$PAYLOAD_TOKEN"; fi
+
+      - name: Check inputs
+        run: |
+          set -euo pipefail
+          [[ "$JOB_ID" =~ ^[a-f0-9]{24}$ ]] || { echo "::error::job_id نامعتبر است"; exit 1; }
+          [[ "$PACKAGE_NAME" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$ ]] || { echo "::error::package_name نامعتبر است"; exit 1; }
+          [[ "$VERSION_CODE" =~ ^[0-9]{1,9}$ ]] || { echo "::error::version_code نامعتبر است"; exit 1; }
+          [ -n "$APP_NAME" ] || { echo "::error::نام اپلیکیشن خالی است"; exit 1; }
+
+      - name: Checkout builder repo
+        uses: actions/checkout@v4
+
+      - name: Fetch app files
+        run: python3 scripts/fetch_payload.py
+
+      - name: Set up Python imaging
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet pillow
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+
+      - name: Prepare project
+        run: python3 scripts/prepare_project.py
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
+      - name: Install Android SDK parts
+        run: |
+          set -euo pipefail
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then SDKM="$(ls "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | head -n1)"; fi
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Decode signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "::error::رازهای امضا (KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) در Settings > Secrets تنظیم نشده‌اند."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build signed APK
+        working-directory: build
+        env:
+          APP_ID: ${{ inputs.package_name }}
+          VERSION_NAME: "1.0"
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle --no-daemon --stacktrace assembleRelease
+
+      - name: Verify APK
+        run: |
+          set -euo pipefail
+          APK="build/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK" || { echo "::error::فایل APK ساخته نشد"; exit 1; }
+          APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)"
+          "$APKSIGNER" verify --verbose "$APK"
+          mkdir -p out
+          cp "$APK" out/app.apk
+          ls -l out/app.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ inputs.job_id }}
+          path: out/app.apk
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

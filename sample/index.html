@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>آزمایش Fizer</title>
+<style>
+  body{font-family:sans-serif;background:#0f172a;color:#fff;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;text-align:center}
+  button{padding:14px 22px;border:0;border-radius:12px;background:#25a98a;color:#fff;font-size:16px}
+</style>
+</head>
+<body>
+  <div>
+    <h1>سلام! این APK آزمایشی Fizer است ✅</h1>
+    <p id="n">تعداد کلیک: ۰</p>
+    <button onclick="c++;document.getElementById('n').textContent='تعداد کلیک: '+c;localStorage.setItem('c',c)">کلیک کن</button>
+  </div>
+  <script>var c=+(localStorage.getItem('c')||0);document.getElementById('n').textContent='تعداد کلیک: '+c;</script>
+</body>
+</html>
