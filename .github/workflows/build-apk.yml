@@ -41,7 +41,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       JOB_ID: ${{ inputs.job_id }}
       APP_NAME: ${{ inputs.app_name }}
