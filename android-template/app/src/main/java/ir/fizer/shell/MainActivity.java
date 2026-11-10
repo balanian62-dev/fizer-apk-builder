@@ -61,7 +61,7 @@ public class MainActivity extends Activity {
         settings.setDatabaseEnabled(true);
         // انتخاب فایل از طریق SAF انجام می‌شود؛ دسترسی عمومی به فایل‌سیستم باز نیست.
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        settings.setAllowContentAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
