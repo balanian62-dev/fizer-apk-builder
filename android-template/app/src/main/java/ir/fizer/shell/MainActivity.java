@@ -5,7 +5,6 @@ import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -198,7 +197,7 @@ public class MainActivity extends Activity {
                 ? new Notification.Builder(this, NOTIFICATION_CHANNEL)
                 : new Notification.Builder(this);
         builder.setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle(title.isEmpty() ? getString(getApplicationInfo().labelRes) : title)
+                .setContentTitle(title.isEmpty() ? getApplicationInfo().loadLabel(getPackageManager()) : title)
                 .setContentText(body)
                 .setAutoCancel(true);
         manager.notify((int) (System.currentTimeMillis() & 0x7fffffff), builder.build());
