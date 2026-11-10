@@ -7,7 +7,6 @@ android {
     compileSdk 35
 
     defaultConfig {
-        // شناسه بسته و نسخه از متغیرهای محیطی گردش‌کار می‌آیند.
         applicationId System.getenv('APP_ID') ?: 'ir.fizer.sample'
         minSdk 24
         targetSdk 35
@@ -43,4 +42,5 @@ android {
 
 dependencies {
     implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.core:core:1.15.0'
 }
