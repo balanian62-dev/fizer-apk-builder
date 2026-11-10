@@ -203,7 +203,7 @@ public class MainActivity extends Activity {
         manager.notify((int) (System.currentTimeMillis() & 0x7fffffff), builder.build());
     }
 
-    private class FizerNativeBridge {
+    public class FizerNativeBridge {
         @JavascriptInterface
         public String getNotificationPermission() {
             return notificationPermissionState();
