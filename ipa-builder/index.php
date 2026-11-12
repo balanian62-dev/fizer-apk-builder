@@ -19,6 +19,7 @@ if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
 <div class="field"><label for="url">آدرس کامل وب‌سایت</label><input id="url" name="url" type="url" placeholder="https://example.com" required></div>
 <div class="field"><label for="name">نام اپلیکیشن</label><input id="name" name="app_name" maxlength="30" placeholder="مثلاً اف Ai" required></div>
 <div class="field"><label for="bundle">شناسه برنامه (Bundle ID)</label><input id="bundle" name="bundle_id" value="ir.fizer.webapp" pattern="[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+" required><div class="hint">نمونه: ir.fizer.myapp — باید در حساب توسعه‌دهنده اپل با شناسه امضا هماهنگ باشد.</div></div>
+<div class="field"><label for="logo">لوگوی برنامه (آیکون آیفون)</label><input id="logo" name="logo" type="file" accept="image/png,.png" required><div class="hint">فقط PNG مربعی با ابعاد حداقل ۱۰۲۴×۱۰۲۴ پیکسل و حداکثر ۵ مگابایت.</div></div>
 <button class="btn" id="submitBtn" type="submit">شروع ساخت IPA</button>
 </form>
 <div class="status" id="status" role="status"></div>
@@ -28,7 +29,7 @@ if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
 const form=document.getElementById('buildForm'),btn=document.getElementById('submitBtn'),statusBox=document.getElementById('status');
 form.addEventListener('submit',async e=>{e.preventDefault();btn.disabled=true;btn.textContent='در حال ارسال درخواست…';statusBox.style.display='block';statusBox.textContent='در حال اتصال امن به GitHub…';
 try{
-const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(form))),credentials:'same-origin'});
+const r=await fetch('api.php',{method:'POST',headers:{'Accept':'application/json'},body:new FormData(form),credentials:'same-origin'});
 const responseText=await r.text();
 let data;
 try{data=JSON.parse(responseText);}catch(parseError){
