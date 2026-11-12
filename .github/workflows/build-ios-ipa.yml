@@ -68,6 +68,7 @@ jobs:
           WEBSITE_URL: ${{ inputs.website_url }}
           APP_NAME: ${{ inputs.app_name }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
+          LOGO_URL: ${{ inputs.logo_url }}
         run: |
           mkdir ios-wrapper
           cd ios-wrapper
