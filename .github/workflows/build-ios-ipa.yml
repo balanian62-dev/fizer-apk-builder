@@ -1,0 +1,83 @@
+name: Build iOS IPA
+on:
+  workflow_dispatch:
+    inputs:
+      website_url:
+        description: HTTPS website URL to wrap
+        required: true
+        type: string
+      app_name:
+        description: App display name
+        required: true
+        type: string
+      bundle_id:
+        description: iOS bundle identifier
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Validate inputs
+        env:
+          WEBSITE_URL: ${{ inputs.website_url }}
+          APP_NAME: ${{ inputs.app_name }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+        run: |
+          python3 - <<'PY'
+          import os, re, urllib.parse
+          u=urllib.parse.urlparse(os.environ["WEBSITE_URL"])
+          assert u.scheme == "https" and u.netloc, "A valid HTTPS URL is required"
+          assert 2 <= len(os.environ["APP_NAME"]) <= 30, "App name must be 2-30 chars"
+          assert re.fullmatch(r"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+", os.environ["BUNDLE_ID"]), "Invalid bundle ID"
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Create Capacitor iOS project
+        env:
+          WEBSITE_URL: ${{ inputs.website_url }}
+          APP_NAME: ${{ inputs.app_name }}
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+        run: |
+          mkdir ios-wrapper && cd ios-wrapper
+          mkdir www
+          printf '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>Loading…</body></html>' > www/index.html
+          npm init -y
+          npm install @capacitor/core @capacitor/ios
+          npm install --save-dev @capacitor/cli
+          cat > capacitor.config.json <<EOF
+          {
+            "appId": "$BUNDLE_ID",
+            "appName": "$APP_NAME",
+            "webDir": "www",
+            "server": { "url": "$WEBSITE_URL", "cleartext": false, "allowNavigation": ["*"] }
+          }
+          EOF
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build iOS app (unsigned)
+        run: |
+          cd ios-wrapper
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+          APP_PATH="build/Build/Products/Release-iphoneos/App.app"
+          test -d "$APP_PATH"
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/App.app
+          zip -qry ../FizerApp-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-unsigned
+          path: FizerApp-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 5
