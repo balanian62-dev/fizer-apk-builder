@@ -34,7 +34,7 @@ jobs:
           u=urllib.parse.urlparse(os.environ["WEBSITE_URL"])
           assert u.scheme == "https" and u.netloc, "A valid HTTPS URL is required"
           assert 2 <= len(os.environ["APP_NAME"]) <= 30, "App name must be 2-30 chars"
-          assert re.fullmatch(r"[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+", os.environ["BUNDLE_ID"]), "Invalid bundle ID"
+          assert re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", os.environ["BUNDLE_ID"]), "Invalid bundle ID"
           PY
 
       - uses: actions/setup-node@v4
