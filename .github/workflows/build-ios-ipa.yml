@@ -79,12 +79,12 @@ jobs:
           npm install --no-audit --no-fund --save-dev @capacitor/assets
           mkdir -p assets
           curl --fail --silent --show-error --location "$LOGO_URL" --output assets/logo.png
-          python3 - <<'PY'
-          from PIL import Image
-          im = Image.open("assets/logo.png")
-          w, h = im.size
-          assert im.format == "PNG" and w == h and w >= 1024, f"Logo must be square PNG at least 1024x1024; got {w}x{h}"
-          PY
+          WIDTH=$(sips -g pixelWidth assets/logo.png | awk '/pixelWidth/ {print $2}')
+          HEIGHT=$(sips -g pixelHeight assets/logo.png | awk '/pixelHeight/ {print $2}')
+          if [ "$WIDTH" -lt 1024 ] || [ "$WIDTH" -ne "$HEIGHT" ]; then
+            echo "Logo must be a square PNG at least 1024x1024; got ${WIDTH}x${HEIGHT}"
+            exit 1
+          fi
           python3 - <<'PY'
           import json, os
           config = {
