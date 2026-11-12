@@ -15,6 +15,10 @@ on:
         description: iOS bundle identifier
         required: true
         type: string
+      logo_url:
+        description: Public temporary URL of the 1024px PNG app icon
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -43,6 +47,7 @@ jobs:
           WEBSITE_URL: ${{ inputs.website_url }}
           APP_NAME: ${{ inputs.app_name }}
           BUNDLE_ID: ${{ inputs.bundle_id }}
+          LOGO_URL: ${{ inputs.logo_url }}
         run: |
           python3 - <<'PY'
           import os, re, urllib.parse
@@ -71,6 +76,15 @@ jobs:
           npm init -y
           npm install --no-audit --no-fund @capacitor/core @capacitor/ios
           npm install --no-audit --no-fund --save-dev @capacitor/cli
+          npm install --no-audit --no-fund --save-dev @capacitor/assets
+          mkdir -p assets
+          curl --fail --silent --show-error --location "$LOGO_URL" --output assets/logo.png
+          python3 - <<'PY'
+          from PIL import Image
+          im = Image.open("assets/logo.png")
+          w, h = im.size
+          assert im.format == "PNG" and w == h and w >= 1024, f"Logo must be square PNG at least 1024x1024; got {w}x{h}"
+          PY
           python3 - <<'PY'
           import json, os
           config = {
@@ -84,6 +98,7 @@ jobs:
           PY
           npx cap add ios
           npx cap sync ios
+          npx @capacitor/assets generate --ios --iconBackgroundColor '#ffffff' --splashBackgroundColor '#ffffff'
 
       - name: Check signing configuration
         id: signing
