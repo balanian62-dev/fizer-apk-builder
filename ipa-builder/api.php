@@ -59,7 +59,7 @@ foreach (glob($uploadDir . '/*.png') ?: [] as $oldFile) {
 $fileName = bin2hex(random_bytes(24)) . '.png';
 $filePath = $uploadDir . '/' . $fileName;
 if (!move_uploaded_file($tmp, $filePath)) fail('ذخیره لوگو روی هاست انجام نشد؛ مجوز پوشه uploads را بررسی کن.', 500);
-$logoUrl = 'https://ipa.fizer.ir/ipa-builder/uploads/' . $fileName;
+$logoUrl = 'https://ipa.fizer.ir/uploads/' . $fileName;
 
 $payload = [
     'ref' => 'main',
