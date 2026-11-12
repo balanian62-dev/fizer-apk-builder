@@ -21,7 +21,7 @@ permissions:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - name: Validate inputs
         env:
@@ -34,7 +34,7 @@ jobs:
           u=urllib.parse.urlparse(os.environ["WEBSITE_URL"])
           assert u.scheme == "https" and u.netloc, "A valid HTTPS URL is required"
           assert 2 <= len(os.environ["APP_NAME"]) <= 30, "App name must be 2-30 chars"
-          assert re.fullmatch(r"[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+", os.environ["BUNDLE_ID"]), "Invalid bundle ID"
+          assert re.fullmatch(r"[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+", os.environ["BUNDLE_ID"]), "Invalid bundle ID"
           PY
 
       - uses: actions/setup-node@v4
@@ -53,18 +53,48 @@ jobs:
           npm init -y
           npm install @capacitor/core @capacitor/ios
           npm install --save-dev @capacitor/cli
-          cat > capacitor.config.json <<EOF
-          {
-            "appId": "$BUNDLE_ID",
-            "appName": "$APP_NAME",
-            "webDir": "www",
-            "server": { "url": "$WEBSITE_URL", "cleartext": false, "allowNavigation": ["*"] }
-          }
-          EOF
+          python3 - <<'PY'
+          import json, os
+          config={"appId":os.environ["BUNDLE_ID"],"appName":os.environ["APP_NAME"],"webDir":"www","server":{"url":os.environ["WEBSITE_URL"],"cleartext":False}}
+          with open("capacitor.config.json","w") as f: json.dump(config,f)
+          PY
           npx cap add ios
           npx cap sync ios
 
-      - name: Build iOS app (unsigned)
+      - name: Check signing configuration
+        id: signing
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          if [ -n "$IOS_CERTIFICATE_BASE64" ] && [ -n "$IOS_CERTIFICATE_PASSWORD" ] && [ -n "$IOS_PROVISION_PROFILE_BASE64" ] && [ -n "$IOS_TEAM_ID" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            CERT_PATH="$RUNNER_TEMP/distribution.p12"
+            PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+            KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+            echo "$IOS_CERTIFICATE_BASE64" | base64 --decode -o "$CERT_PATH"
+            echo "$IOS_PROVISION_PROFILE_BASE64" | base64 --decode -o "$PROFILE_PATH"
+            security create-keychain -p "$IOS_CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
+            security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+            security unlock-keychain -p "$IOS_CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
+            security import "$CERT_PATH" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+            security list-keychains -d user -s "$KEYCHAIN_PATH"
+            security set-key-partition-list -S apple-tool:,apple: -s -k "$IOS_CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
+            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$PROFILE_PATH")" 2>/dev/null || /usr/libexec/PlistBuddy -c 'Print UUID' /tmp/profile.plist)
+            security cms -D -i "$PROFILE_PATH" > "$RUNNER_TEMP/profile.plist"
+            PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' "$RUNNER_TEMP/profile.plist")
+            mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+            cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+            echo "profile_uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Apple signing secrets not configured; producing an unsigned IPA."
+          fi
+
+      - name: Build unsigned IPA
+        if: steps.signing.outputs.enabled != 'true'
         run: |
           cd ios-wrapper
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -derivedDataPath build CODE_SIGNING_ALLOWED=NO
@@ -74,10 +104,42 @@ jobs:
           cp -R "$APP_PATH" Payload/App.app
           zip -qry ../FizerApp-unsigned.ipa Payload
 
+      - name: Build and export signed IPA
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          PROFILE_UUID: ${{ steps.signing.outputs.profile_uuid }}
+        run: |
+          cd ios-wrapper
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos -archivePath "$RUNNER_TEMP/FizerApp.xcarchive" archive CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$IOS_TEAM_ID" PROVISIONING_PROFILE="$PROFILE_UUID" CODE_SIGN_IDENTITY="Apple Distribution"
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>method</key><string>ad-hoc</string>
+          <key>teamID</key><string>$IOS_TEAM_ID</string>
+          <key>signingStyle</key><string>manual</string>
+          <key>provisioningProfiles</key><dict><key>$BUNDLE_ID</key><string>$PROFILE_UUID</string></dict>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/FizerApp.xcarchive" -exportPath "$RUNNER_TEMP/export" -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+          cp "$RUNNER_TEMP/export/"*.ipa ../FizerApp-signed.ipa
+
       - name: Upload unsigned IPA
+        if: steps.signing.outputs.enabled != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa-unsigned
           path: FizerApp-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 5
+
+      - name: Upload signed IPA
+        if: steps.signing.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-signed
+          path: FizerApp-signed.ipa
           if-no-files-found: error
           retention-days: 5
