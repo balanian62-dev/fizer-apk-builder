@@ -27,6 +27,21 @@ if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
 <script>
 const form=document.getElementById('buildForm'),btn=document.getElementById('submitBtn'),statusBox=document.getElementById('status');
 form.addEventListener('submit',async e=>{e.preventDefault();btn.disabled=true;btn.textContent='در حال ارسال درخواست…';statusBox.style.display='block';statusBox.textContent='در حال اتصال امن به GitHub…';
-try{const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(form)))});const data=await r.json();if(!r.ok)throw new Error(data.error||'خطا در ثبت درخواست');statusBox.innerHTML='درخواست ساخت ثبت شد. برای مشاهده وضعیت و دریافت خروجی از این لینک استفاده کن: <br><a target="_blank" rel="noopener" href="'+data.actions_url+'">مشاهده فرایند ساخت در GitHub Actions</a><br><span class="hint">پس از پایان موفق، از بخش Artifacts فایل IPA را دریافت کن.</span>';btn.textContent='درخواست جدید';}catch(err){statusBox.textContent='خطا: '+err.message;btn.textContent='تلاش دوباره';}finally{btn.disabled=false;}
+try{
+const r=await fetch('api.php',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(form))),credentials:'same-origin'});
+const responseText=await r.text();
+let data;
+try{data=JSON.parse(responseText);}catch(parseError){
+const preview=responseText.replace(/<script[\\s\\S]*?<\\/script>/gi,' ').replace(/<style[\\s\\S]*?<\\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ').trim().slice(0,500);
+throw new Error('پاسخ سرور JSON نیست (HTTP '+r.status+'). '+(preview||'پاسخ خالی یا نامشخص است.'));
+}
+if(!r.ok)throw new Error(data.error||('خطای سرور HTTP '+r.status));
+if(!data.actions_url)throw new Error('پاسخ سرور ناقص است؛ لینک GitHub دریافت نشد.');
+statusBox.textContent='درخواست ساخت ثبت شد. برای مشاهده وضعیت و دریافت خروجی از لینک زیر استفاده کن: ';
+const link=document.createElement('a');link.href=data.actions_url;link.target='_blank';link.rel='noopener';link.textContent='مشاهده فرایند ساخت در GitHub Actions';
+statusBox.appendChild(document.createElement('br'));statusBox.appendChild(link);
+const note=document.createElement('div');note.className='hint';note.textContent='پس از پایان موفق، از بخش Artifacts فایل IPA را دریافت کن.';statusBox.appendChild(document.createElement('br'));statusBox.appendChild(note);
+btn.textContent='درخواست جدید';
+}catch(err){statusBox.textContent='خطا: '+err.message;btn.textContent='تلاش دوباره';}finally{btn.disabled=false;}
 });
 </script></body></html>
