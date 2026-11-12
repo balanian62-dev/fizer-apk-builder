@@ -24,5 +24,10 @@ $ch = curl_init("https://api.github.com/repos/".rawurlencode($owner)."/".rawurle
 curl_setopt_array($ch, [CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>['Accept: application/vnd.github+json','Authorization: Bearer '.$token,'X-GitHub-Api-Version: 2022-11-28','User-Agent: Fizer-IPA-Builder','Content-Type: application/json'],CURLOPT_POSTFIELDS=>json_encode($payload),CURLOPT_TIMEOUT=>25]);
 $response = curl_exec($ch); $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $error = curl_error($ch); curl_close($ch);
 if ($response === false) fail('ارتباط با GitHub برقرار نشد: '.$error, 502);
-if (!in_array($status, [200, 204], true)) {\n  $githubData = json_decode((string)$response, true);\n  $githubMessage = is_array($githubData) ? (string)($githubData['message'] ?? '') : '';\n  $detail = $githubMessage !== '' ? ' پیام GitHub: '.$githubMessage : '';\n  fail('GitHub درخواست را نپذیرفت (HTTP '.$status.').'.$detail.' نام مالک، مخزن، فایل workflow و دسترسی توکن را بررسی کن.', 502);\n}
+if (!in_array($status, [200, 204], true)) {
+  $githubData = json_decode((string)$response, true);
+  $githubMessage = is_array($githubData) ? (string)($githubData['message'] ?? '') : '';
+  $detail = $githubMessage !== '' ? ' پیام GitHub: '.$githubMessage : '';
+  fail('GitHub درخواست را نپذیرفت (HTTP '.$status.').'.$detail.' نام مالک، مخزن، فایل workflow و دسترسی توکن را بررسی کن.', 502);
+}
 echo json_encode(['ok'=>true,'actions_url'=>"https://github.com/{$owner}/{$repo}/actions/workflows/build-ios-ipa.yml"], JSON_UNESCAPED_UNICODE);
