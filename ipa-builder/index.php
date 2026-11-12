@@ -33,7 +33,7 @@ const r=await fetch('api.php',{method:'POST',headers:{'Accept':'application/json
 const responseText=await r.text();
 let data;
 try{data=JSON.parse(responseText);}catch(parseError){
-const preview=responseText.replace(/<script[\\s\\S]*?<\\/script>/gi,' ').replace(/<style[\\s\\S]*?<\\/style>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ').trim().slice(0,500);
+const preview=responseText.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,500);
 throw new Error('پاسخ سرور JSON نیست (HTTP '+r.status+'). '+(preview||'پاسخ خالی یا نامشخص است.'));
 }
 if(!r.ok)throw new Error(data.error||('خطای سرور HTTP '+r.status));
