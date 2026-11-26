@@ -25,12 +25,5 @@ Name: "{autodesktop}\اف Ai"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 [Tasks]
 Name: "desktopicon"; Description: "ساخت میانبر روی دسکتاپ"; GroupDescription: "میانبرها:"
 [Run]
-Filename: "{tmp}\WebView2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "در حال نصب پیش‌نیاز نمایش وب..."; Flags: runhidden waituntilterminated; Check: not IsWebView2Installed
+Filename: "{tmp}\WebView2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "در حال نصب پیش‌نیاز نمایش وب..."; Flags: runhidden waituntilterminated
 Filename: "{app}\{#AppExe}"; Description: "اجرای اف Ai"; Flags: postinstall nowait skipifsilent
-[Code]
-function IsWebView2Installed(): Boolean;
-var V: String;
-begin
-  Result := RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F1E7E5F8-2D7A-4D5B-9B5A-7C5E8A3B7B4C}', 'pv', V)
-    or RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F1E7E5F8-2D7A-4D5B-9B5A-7C5E8A3B7B4C}', 'pv', V);
-end;
