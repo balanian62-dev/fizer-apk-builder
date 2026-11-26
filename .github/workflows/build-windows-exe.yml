@@ -1,0 +1,36 @@
+name: Build Af Ai for Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'windows-desktop/**'
+      - '.github/workflows/build-windows-exe.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish self-contained Windows app
+        shell: pwsh
+        run: dotnet publish windows-desktop/AfAi.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+      - name: Download WebView2 Runtime installer
+        shell: pwsh
+        run: Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile 'windows-desktop/WebView2Setup.exe'
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Build installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          & 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' windows-desktop/installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Af-Ai-Windows-Installer
+          path: dist/Af-Ai-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
