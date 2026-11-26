@@ -13,6 +13,7 @@ OutputBaseFilename=Af-Ai-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=app.ico
 ArchitecturesInstallIn64BitMode=x64
 UninstallDisplayIcon={app}\{#AppExe}
 [Files]
