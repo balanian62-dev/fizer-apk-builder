@@ -19,11 +19,11 @@ jobs:
         shell: pwsh
         run: |
           [IO.File]::WriteAllBytes('windows-desktop/logo.jpg', [Convert]::FromBase64String((Get-Content 'windows-desktop/logo.jpg.b64' -Raw)))
-          python -m pip install pillow
-          python -c "from PIL import Image; Image.open('windows-desktop/logo.jpg').save('windows-desktop/app.ico', format='ICO', sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])"
+          python -m pip install --disable-pip-version-check pillow
+          python -c "from PIL import Image, ImageFile; ImageFile.LOAD_TRUNCATED_IMAGES=True; image=Image.open('windows-desktop/logo.jpg').convert('RGBA'); image.save('windows-desktop/app.ico', format='ICO', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])"
       - name: Publish self-contained Windows app
         shell: pwsh
-        run: dotnet publish windows-desktop/AfAi.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
+        run: dotnet publish windows-desktop/AfAi.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=false -p:PublishReadyToRun=true -o publish
       - name: Download WebView2 Runtime installer
         shell: pwsh
         run: Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile 'windows-desktop/WebView2Setup.exe'
